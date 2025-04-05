@@ -1,88 +1,107 @@
 import tkinter as tk
+from tkinter import ttk
 import time
 from threading import Thread
+from ttkthemes import ThemedTk
+import sys
+import os
 
+def resource_path(relative_path):
+    """ Get the absolute path to a resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS  # PyInstaller extracts here
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 class PomodoroTimer:
-#__init__ pretty much stands for initializing, it initializes the class, sets up the initial state of the pomodoro timer.
+    
+    def __init__(self, root):
+        # Initialize main window
+        self.root = root
+        icon_path = resource_path('images/icon.png')
+        icon_image = tk.PhotoImage(file=icon_path)
+        self.root.iconphoto(False, icon_image)
+        self.root.title(" Pomodoro Timer")
+        self.root.geometry("500x300")
+        self.root.configure(bg='#F0F8FF')
+        self.root.resizable(False, False)
+    
 
-    def __init__(self, tkwindow):
+        # Timer control variables
+        self.running = False
+        self.work_duration = 25 * 60
+        self.break_duration = 5 * 60
+        self.time_left = self.work_duration
 
+        # Timer display label
+        self.timer_label = tk.Label(
+            root, text=self.format_time(self.time_left),
+            font=("Segoe UI", 52, "bold"), bg='#F0F8FF', fg='#333')
+        self.timer_label.pack(pady=20)
 
-# "self" is refering to this class, "PomodoroTimer", self.tkwindow is an instance attribute for PomodoroTimer. it
-# becomes an attribute of the class instance. This means any method within the PomodoroTimer class can access
-# self.tkwindow and, therefore, interact with the tkinter window. It is unique to each instance and can be used in
-# any method of the class to access or modify the tkinter window. tkwindow without 'self' is a local variable to
-# __init__ and is limited to this method's scope. self.tkwindow allows the PomodoroTimer object to remember and
-# utilize the tkinter window for its operations like displaying timers and buttons.
+        # Button style
+        style = ttk.Style()
+        style.configure('TButton', font=('Segoe UI', 14), padding=5)
 
-        self.tkwindow = tkwindow
-        self.tkwindow.title("Pomodoro Timer")
+        # Container for buttons
+        buttons_frame = tk.Frame(root, bg='#F0F8FF')
+        buttons_frame.pack(pady=10)
 
+        # Control buttons
+        self.start_button = ttk.Button(buttons_frame, text="▶️ Start", command=self.start_timer)
+        self.start_button.grid(row=0, column=0, padx=5)
 
-#self.state = False is setting the initial state of the timer to "not running" when an instance of the class is created.
+        self.pause_button = ttk.Button(buttons_frame, text="⏸ Pause", command=self.pause_timer)
+        self.pause_button.grid(row=0, column=1, padx=5)
 
-        self.state = False
-# Since there are 60 seconds in a minute, to convert 25 minutes into seconds, you multiply 25 by 60. This gives you
-# the total number of seconds in 25 minutes.
+        self.reset_button = ttk.Button(buttons_frame, text="🔄 Reset", command=self.reset_timer)
+        self.reset_button.grid(row=0, column=2, padx=5)
 
-        self.work_time = 30 * 60
-        self.break_time = 10 * 60
+    def format_time(self, seconds):
+        # Format seconds to MM:SS
+        return time.strftime('%M:%S', time.gmtime(seconds))
 
-# this is setting the current time as 30 minutes, when the timer starts to count down it will actively show it,
-# in other words this is necessary to keep track of the time
-
-        self.current_time = self.work_time
-        self.display_time = self.current_time
-
-#this section is responsible for creating and displaying the labels and buttons in the GUI
-
-        self.timer_label = tk.Label(self.tkwindow, text=self.format_time(self.display_time), font=("Helvetica",48))
-        self.timer_label.pack()
-
-        self.start_button = tk.Button(self.tkwindow, text="Start", command=self.start_timer)
-        self.start_button.pack()
-
-        self.pause_button = tk.Button(self.tkwindow, text="Pause", command=self.pause_time)
-        self.pause_button.pack()
-
-        self.reset_button = tk.Button(self.tkwindow, text="Reset", command=self.reset_timer)
-        self.reset_button.pack()
-
-#text formatting in tkwindow
-    def format_time(self,seconds):
-    #"Return" in programming isn't quite like a "continue" button.
-    #It's actually more like an "exit" button that also has the ability to hand you something on the way out.
-        return time.strftime('%M:%S',time.gmtime(seconds))
     def update_timer(self):
-        while self.state:
-            self.display_time -= 1
+        # Update timer every second
+        while self.running and self.time_left:
             time.sleep(1)
-            self.timer_label.config(text=self.format_time(self.display_time))
-            self.tkwindow.update()
-            if self.display_time == 0:
-                self.state=False
-#
-                self.current_time = self.break_time if self.current_time == self.work_time else self.work_time
-                self.display_time = self.current_time
+            self.time_left -= 1
+            self.timer_label.config(text=self.format_time(self.time_left))
 
+        # Switch modes when timer ends
+        if self.time_left == 0:
+            self.running = False
+            self.switch_mode()
 
+    def switch_mode(self):
+        # Switch between work and break durations
+        if self.time_left == 0:
+            if self.time_left == self.work_duration:
+                self.time_left = self.break_duration
+            else:
+                self.time_left = self.work_duration
+
+            self.timer_label.config(text=self.format_time(self.time_left))
 
     def start_timer(self):
+        # Start timer thread
+        if not self.running:
+            self.running = True
+            Thread(target=self.update_timer).start()
 
-        if not self.state:
-            self.state= True
-            self.thread = Thread(target=self.update_timer)
-            self.thread.start()
+    def pause_timer(self):
+        # Pause timer
+        self.running = False
 
     def reset_timer(self):
-        self.state=False
-        self.display_time = self.work_time
-        self.timer_label.config(text=self.format_time(self.display_time))
+        # Reset timer to initial work duration
+        self.running = False
+        self.time_left = self.work_duration
+        self.timer_label.config(text=self.format_time(self.time_left))
 
-    def pause_time(self):
-        self.state = False
-
-root = tk.Tk()
-timer = PomodoroTimer(root)
-root.mainloop()
+if __name__ == '__main__':
+    root = tk.Tk()
+    app = PomodoroTimer(root)
+    root.mainloop()
